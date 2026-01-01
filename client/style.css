@@ -1,0 +1,46 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #111;
+  color: #fff;
+  text-align: center;
+  padding-top: 60px;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+#status {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+#timer {
+  font-size: 48px;
+  margin: 20px;
+}
+
+button {
+  font-size: 32px;
+  padding: 20px 40px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scores {
+  margin-top: 20px;
+  font-size: 20px;
+}
+
+.hidden {
+  display: none;
+}
+
+#result {
+  font-size: 32px;
+  margin-top: 40px;
+}
