@@ -1,29 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Click War</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Clicker</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <h1>🔥 Click War 🔥</h1>
+<h1>🔥 Clicker Duel 🔥</h1>
+<div id="online">🟢 Online: 0</div>
+<div id="status">Connecting…</div>
 
-  <div id="status">Connecting…</div>
-
-  <div id="game" class="hidden">
-    <div id="timer">10</div>
-
-    <button id="clickBtn" disabled>CLICK!</button>
-
-    <div class="scores">
-      <p>You: <span id="you">0</span></p>
-      <p>Opponent: <span id="opponent">0</span></p>
-    </div>
+<div id="game" class="hidden">
+  <div id="timer">10</div>
+  <button id="clickBtn" disabled>CLICK</button>
+  <div class="scores">
+    You: <span id="you">0</span> |
+    Opponent: <span id="opponent">0</span>
   </div>
+</div>
 
-  <div id="result" class="hidden"></div>
+<div id="result" class="hidden"></div>
 
-  <script src="game.js"></script>
+<script src="game.js"></script>
 </body>
 </html>

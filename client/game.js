@@ -1,7 +1,10 @@
-// CHANGE THIS AFTER DEPLOY
-const WS_URL = "ws://10.17.38.163:8000/ws";
+const WS_URL =
+  location.protocol === "https:"
+    ? `wss://${location.host}/ws`
+    : `ws://${location.host}/ws`;
 
 const statusEl = document.getElementById("status");
+const onlineEl = document.getElementById("online");
 const gameEl = document.getElementById("game");
 const resultEl = document.getElementById("result");
 
@@ -11,88 +14,71 @@ const youEl = document.getElementById("you");
 const oppEl = document.getElementById("opponent");
 
 let ws;
-let timeLeft = 10;
-let timerInterval = null;
+let timer;
 
-// ---- WebSocket setup ----
-function connect() {
-  ws = new WebSocket(WS_URL);
+ws = new WebSocket(WS_URL);
 
-  ws.onopen = () => {
-    statusEl.textContent = "Connected. Waiting for opponent…";
-  };
+ws.onopen = () => {
+  statusEl.textContent = "Waiting for opponent…";
+};
 
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
 
-    switch (msg.type) {
-      case "waiting":
-        statusEl.textContent = "Waiting for opponent…";
-        break;
+  if (msg.type === "online_count") {
+    onlineEl.textContent = `🟢 Online: ${msg.count}`;
+  }
 
-      case "start":
-        startGame(msg.duration);
-        break;
+  if (msg.type === "waiting") {
+    statusEl.textContent = "Waiting for opponent…";
+  }
 
-      case "score_update":
-        youEl.textContent = msg.you;
-        oppEl.textContent = msg.opponent;
-        break;
+  if (msg.type === "start") {
+    startGame(msg.duration);
+  }
 
-      case "end":
-        endGame(msg);
-        break;
-    }
-  };
+  if (msg.type === "score_update") {
+    youEl.textContent = msg.you;
+    oppEl.textContent = msg.opponent;
+  }
 
-  ws.onclose = () => {
-    statusEl.textContent = "Disconnected from server.";
-    clickBtn.disabled = true;
-  };
-}
+  if (msg.type === "end") {
+    endGame(msg);
+  }
+};
 
-// ---- Game logic ----
 function startGame(duration) {
-  statusEl.textContent = "Game started!";
   gameEl.classList.remove("hidden");
   resultEl.classList.add("hidden");
-
-  timeLeft = duration;
-  timerEl.textContent = timeLeft;
-
-  youEl.textContent = "0";
-  oppEl.textContent = "0";
-
+  statusEl.textContent = "GO!";
   clickBtn.disabled = false;
 
-  timerInterval = setInterval(() => {
-    timeLeft--;
-    timerEl.textContent = timeLeft;
-    if (timeLeft <= 0) clearInterval(timerInterval);
+  youEl.textContent = 0;
+  oppEl.textContent = 0;
+
+  let time = duration;
+  timerEl.textContent = time;
+
+  timer = setInterval(() => {
+    time--;
+    timerEl.textContent = time;
+    if (time <= 0) clearInterval(timer);
   }, 1000);
 }
 
 function endGame(msg) {
   clickBtn.disabled = true;
-  clearInterval(timerInterval);
-
   gameEl.classList.add("hidden");
   resultEl.classList.remove("hidden");
 
-  let text = "";
-  if (msg.result === "win") text = "🏆 You Win!";
-  else if (msg.result === "lose") text = "❌ You Lose!";
-  else text = "🤝 Draw";
+  let text =
+    msg.result === "win" ? "🏆 You Win!" :
+    msg.result === "lose" ? "❌ You Lose!" :
+    "🤝 Draw";
 
   resultEl.textContent = `${text} (${msg.your_score} : ${msg.opponent_score})`;
 }
 
-// ---- Click handler ----
 clickBtn.onclick = () => {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "click" }));
-  }
+  ws.send(JSON.stringify({ type: "click" }));
 };
-
-// Start
-connect();

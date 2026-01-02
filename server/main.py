@@ -1,12 +1,19 @@
 import asyncio
 import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 
 app = FastAPI()
 
-# ---- Global state (OK for prototype) ----
+# ---- Serve frontend ----
+BASE_DIR = Path(__file__).resolve().parent.parent
+app.mount("/", StaticFiles(directory=BASE_DIR / "client", html=True), name="client")
+# ---- Global state ----
 waiting_players = []
-matches = {}  # websocket -> match_id
+matches = {}
+connected_users = set()
 
 
 class Match:
@@ -17,12 +24,20 @@ class Match:
         self.ended = False
 
 
-# ---- Helpers ----
 async def safe_send(ws: WebSocket, data: dict):
     try:
         await ws.send_json(data)
     except:
         pass
+
+
+async def broadcast_online_count():
+    count = len(connected_users)
+    for ws in list(connected_users):
+        await safe_send(ws, {
+            "type": "online_count",
+            "count": count
+        })
 
 
 async def end_match(match: Match):
@@ -33,19 +48,19 @@ async def end_match(match: Match):
     p1, p2 = match.players
     s1, s2 = match.scores[p1], match.scores[p2]
 
-    result_p1 = "win" if s1 > s2 else "lose" if s1 < s2 else "draw"
-    result_p2 = "win" if s2 > s1 else "lose" if s2 < s1 else "draw"
+    def result(a, b):
+        return "win" if a > b else "lose" if a < b else "draw"
 
     await safe_send(p1, {
         "type": "end",
-        "result": result_p1,
+        "result": result(s1, s2),
         "your_score": s1,
         "opponent_score": s2
     })
 
     await safe_send(p2, {
         "type": "end",
-        "result": result_p2,
+        "result": result(s2, s1),
         "your_score": s2,
         "opponent_score": s1
     })
@@ -59,17 +74,16 @@ async def match_timer(match: Match):
     await end_match(match)
 
 
-# ---- WebSocket endpoint ----
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    connected_users.add(ws)
+    await broadcast_online_count()
 
     try:
-        # Player joins
-        await safe_send(ws, {"type": "waiting"})
         waiting_players.append(ws)
+        await safe_send(ws, {"type": "waiting"})
 
-        # Matchmaking
         if len(waiting_players) >= 2:
             p1 = waiting_players.pop(0)
             p2 = waiting_players.pop(0)
@@ -78,13 +92,11 @@ async def websocket_endpoint(ws: WebSocket):
             matches[p1] = match
             matches[p2] = match
 
-            # Notify players
             await safe_send(p1, {"type": "start", "duration": 10})
             await safe_send(p2, {"type": "start", "duration": 10})
 
             asyncio.create_task(match_timer(match))
 
-        # ---- Game loop ----
         while True:
             data = await ws.receive_json()
 
@@ -93,7 +105,6 @@ async def websocket_endpoint(ws: WebSocket):
                 if not match or match.ended:
                     continue
 
-                # Time check (anti-cheat)
                 if time.time() - match.start_time > 10:
                     continue
 
@@ -112,7 +123,6 @@ async def websocket_endpoint(ws: WebSocket):
                 })
 
     except WebSocketDisconnect:
-        # Handle disconnect
         if ws in waiting_players:
             waiting_players.remove(ws)
 
@@ -124,6 +134,9 @@ async def websocket_endpoint(ws: WebSocket):
                 "result": "win",
                 "reason": "opponent_disconnected"
             })
-            match.ended = True
             matches.pop(opponent, None)
             matches.pop(ws, None)
+
+    finally:
+        connected_users.discard(ws)
+        await broadcast_online_count()
